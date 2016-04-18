@@ -1,0 +1,32 @@
+{
+  "name": "thewatcher",
+  "version": "0.0.1",
+  "description": "Watches the FileSystem for changes",
+  "main": "index.js",
+  "scripts": {
+    "test": "node node_modules/mocha/bin/mocha --recursive"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/greggman/thewatcher.git"
+  },
+  "keywords": [
+    "files",
+    "folders",
+    "watch",
+    "directories",
+    "filesystem"
+  ],
+  "author": "Gregg Tavares",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/greggman/thewatcher/issues"
+  },
+  "homepage": "https://github.com/greggman/thewatcher#readme",
+  "files": [
+    "index.js"
+  ],
+  "devDependencies": {
+    "mocha": "^2.4.5"
+  }
+}
