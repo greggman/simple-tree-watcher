@@ -27,6 +27,14 @@
     "index.js"
   ],
   "devDependencies": {
+    "eslint": "^2.8.0",
+    "eslint-plugin-google-camelcase": "0.0.2",
+    "eslint-plugin-one-variable-per-var": "0.0.3",
+    "eslint-plugin-optional-comma-spacing": "0.0.4",
+    "eslint-plugin-require-trailing-comma": "0.0.1",
+    "grunt": "^1.0.1",
+    "grunt-eslint": "^18.1.0",
+    "load-grunt-tasks": "^3.5.0",
     "mocha": "^2.4.5"
   }
 }

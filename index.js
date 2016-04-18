@@ -16,7 +16,7 @@ function shallowCopy(src) {
 // Should I add option to normalize path (as in always "/" never "\"?
 
 class TheWatcher extends EventEmitter {
-  constructor(filePath, options, parent) {
+  constructor(filePath, options) {
     super();
     options = shallowCopy(options || {});
     options.addOrCreate = options.addOrCreate || 'add';
@@ -82,7 +82,7 @@ class TheWatcher extends EventEmitter {
   }
 
   _checkFile(fileName, addOrCreate) {
-    addOrCreate = addOrCreate || 'create'
+    addOrCreate = addOrCreate || 'create';
     var fullPath = path.join(this._filePath, fileName);
     fs.stat(fullPath, (err, stats) => {
       var oldStats = this._entries.get(fileName);
@@ -126,7 +126,7 @@ class TheWatcher extends EventEmitter {
 
   _removeAll() {
     // first files
-    this._dirs.forEach((watcher, fileName) => {
+    this._dirs.forEach((watcher) => {
       watcher._removeAll();
     });
     this._entries.forEach((stats, fileName) => {
@@ -143,19 +143,6 @@ class TheWatcher extends EventEmitter {
   _pass() {
     return true;
   }
-
-  _addWatcher(filePath, options) {
-    this.dirs[filePath] = watcher;
-  }
-
-  _removeWatcher(filePath) {
-    var watcher = this.dirs[filePath];
-    if (watcher) {
-      watcher.close();
-    }
-    delete this.dirs[filePath];
-  }
-
 }
 
 module.exports = TheWatcher;
