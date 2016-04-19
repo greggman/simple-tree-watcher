@@ -8,7 +8,7 @@ const TheWatcher    = require('../index.js');
 const EventRecorder = require('../test-lib/event-recorder');
 const TestFS        = require('../test-lib/test-fs');
 
-describe('TheWatcher', function() {
+describe('TheWatcher - basic', function() {
 
   // NOTE: We use the real filesystem because we need to test
   // across plaforms that it works on those actual platforms.
@@ -121,13 +121,24 @@ describe('TheWatcher', function() {
       var added = new Map();
       var events = recorder.getEvents();
       events.forEach((e) => {
-        assert.equal(e.event, 'add', 'event must be add');
-        assert.ok(!added.has(e.name));
-        added.set(e.name);
+        switch (e.event) {
+          case 'add':
+            assert.ok(!added.has(e.name));
+            added.set(e.name);
+            break;
+          case 'change':
+            var addEvents = recorder.getEvents('add', e.name);
+            assert.equal(addEvents.length, 1, 'there is one add event for a change event');
+            assert.ok(addEvents[0].id < e.id, 'add event came first');
+            break;
+          default:
+            assert.ok(false, "must be add or create");
+            break;
+        }
         if (e.stat.isDirectory()) {
-          assert.ok(testFS.createdDirs.indexOf(e.name) >= 0, 'should be directory');
+          assert.ok(testFS.createdDirs.indexOf(e.name) >= 0, 'should be expected directory');
         } else {
-          assert.ok(testFS.createdFiles.indexOf(e.name) >= 0, 'should be file');
+          assert.ok(testFS.createdFiles.indexOf(e.name) >= 0, 'should be expected file');
           assert.equal(e.stat.size, initialContent.length);
         }
       });
