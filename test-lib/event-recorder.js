@@ -1,7 +1,7 @@
 'use strict';
 const debug = require('../lib/debug')('event-recorder');
 
-function EventRecorder() {
+function EventRecorder(watcher) {
   var events;
   var checkFn;
 
@@ -53,6 +53,11 @@ function EventRecorder() {
   this.showEvents = showEvents;
 
   clear();
+
+  watcher.on('add',    function(n, s, o) { record('add',    n, s, o); });  // eslint-disable-line
+  watcher.on('create', function(n, s, o) { record('create', n, s, o); });  // eslint-disable-line
+  watcher.on('change', function(n, s, o) { record('change', n, s, o); });  // eslint-disable-line
+  watcher.on('remove', function(n, s, o) { record('remove', n, s, o); });  // eslint-disable-line
 }
 
 module.exports = EventRecorder;
