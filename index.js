@@ -123,6 +123,9 @@ class TheWatcher extends EventEmitter {
     }
     addOrCreate = addOrCreate || 'create';
     var fullPath = path.join(this._filePath, fileName);
+    if (!this._filter(fullPath)) {
+      return;
+    }
     fs.stat(fullPath, (err, stats) => {
       // Because this is async we might be closed when this gets back
       if (this._closed) {
