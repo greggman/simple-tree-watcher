@@ -81,13 +81,14 @@ describe('TheWatcher', function() {
   });
 
   function noMoreEvents() {
-    recorder.setCheck((events) => {
-      assert.ok(false, 'no events should happen');
+    recorder.setCheck((e) => {
+      assert.ok(false, 'no events should happen. got: "' + e.event + '" event for ' + e.name + (e.stat.isDirectory() ? ' directory' : (', size: ' + e.stat.size + (e.oldStat ? (', oldSize: ' + e.oldStat.size) : ''))));
     });
   }
 
   beforeEach(function() {
     noMoreEvents();
+    recorder.clear();
   });
 
   function getWatcherDir(dir, watcher) {
@@ -115,7 +116,7 @@ describe('TheWatcher', function() {
     clear();
 
     function record(event, name, stat, oldStat) {
-console.log("event:", event, name);
+console.log("event:", event, name, stat.size);
       var e = {
         event: event,
         name: name,
@@ -129,12 +130,24 @@ console.log("event:", event, name);
 
     function clear() {
       events = [];
+      checkFn = () => {};
     }
 
     function setCheck(fn) {
       checkFn = fn;
     }
 
+    function getEvents(type) {
+      if (type) {
+        return events.filter(function(e) {
+          return e.event === type;
+        });
+      }
+      return events;
+    }
+
+    this.clear = clear;
+    this.getEvents = getEvents;
     this.record = record;
     this.setCheck = setCheck;
   }
@@ -182,16 +195,25 @@ console.log("event:", event, name);
   });
 
   it('reports file created to root', function(done) {
+    // check we get create followed by optional change
+    var receivedEvents = new Set();
+    setTimeout(function() {
+      assert.ok(receivedEvents.has("create"), "must have created event");      
+      assert.equal(getWatcherDir("")._entries.size, 5);
+      assert.equal(getWatcherDir("")._dirs.size, 1);
+      noMoreEvents();
+      done();
+    }, extraTime);
     recorder.setCheck((e) => {
-      assert.equal(e.event, 'create', 'event is "create"');
+      if (!receivedEvents.has('create')) {
+        assert.equal(e.event, 'create', 'event is "create"');
+      } else {
+        assert.equal(e.event, 'change', 'event is "change"');
+      }
+      assert.ok(!receivedEvents.has(e.event), 'event recevied once');
+      receivedEvents.add(e.event);
       assert.equal(e.name, nameAtRoot, 'name is ' + nameAtRoot);
       assert.equal(e.stat.size, initialContent.length);
-      noMoreEvents();
-      setTimeout(function() {
-        assert.equal(getWatcherDir("")._entries.size, 5);
-        assert.equal(getWatcherDir("")._dirs.size, 1);
-        done();
-      }, extraTime);
     });
     writeFile(nameAtRoot, initialContent);
   });
@@ -244,18 +266,25 @@ console.log("event:", event, name);
 
   it('reports file added to subfolder', function(done) {
     assert.equal(getWatcherDir("sub1/sub3")._entries.size, 0);
-    recorder.setCheck((e) => {
-      assert.equal(e.event, 'create', 'event is "create"');
-      assert.equal(e.name, nameAtSub, 'name is ' + nameAtSub);
-      assert.equal(e.stat.size, initialContent.length);
-      assert.ok(!e.stat.isDirectory());
-      setTimeout(function() {
-        noMoreEvents();
-        assert.equal(getWatcherDir("sub1/sub3")._entries.size, 1);
-        assert.equal(getWatcherDir("sub1/sub3")._dirs.size, 0);
-        done();
-      }, extraTime);
-    });
+    setTimeout(() => {
+      assert.equal(recorder.getEvents('create').length, 1, "there's one create event");
+      var events = recorder.getEvents();
+      assert.ok(events.length <= 2, "there are at most 2 events");
+      if (events.length > 1) {
+        assert.equal(recorder.getEvents('change').length, 1, "other event is change");
+        assert.ok(recorder.getEvents('create')[0].id <
+                  recorder.getEvents('change')[0].id, "create event came first");
+      }
+      events.forEach((e) => {
+        assert.equal(e.name, nameAtSub, 'name is ' + nameAtSub);
+        assert.equal(e.stat.size, initialContent.length);
+        assert.ok(!e.stat.isDirectory());
+      });
+      noMoreEvents();
+      assert.equal(getWatcherDir("sub1/sub3")._entries.size, 1);
+      assert.equal(getWatcherDir("sub1/sub3")._dirs.size, 0);
+      done();
+    }, extraTime);
     writeFile(nameAtSub, initialContent);
   });
 
