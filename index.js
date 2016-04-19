@@ -53,8 +53,9 @@ class TheWatcher extends EventEmitter {
   }
 
   _start() {
-    this._changeListener = this.__proto__._onChange.bind(this);;
-    this._errorListener = this.__proto__._onError.bind(this);
+    var proto = Object.getPrototypeOf(this);
+    this._changeListener = proto._onChange.bind(this);
+    this._errorListener = proto._onError.bind(this);
     this._watcher = fs.watch(this._filePath, this._options);
     this._watcher.on('change', this._changeListener);
     this._watcher.on('error', this._errorListener);
