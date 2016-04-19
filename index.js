@@ -1,6 +1,12 @@
 (function() {
 'use strict';
 
+var debug;
+try {
+  debug = require('debug')('thewatcher');
+} catch (e) {
+  debug = function() {};
+}
 const fs = require('fs');
 const EventEmitter = require('events');
 const path = require('path');
@@ -30,55 +36,78 @@ class TheWatcher extends EventEmitter {
   }
 
   close() {
-     this._dirs.forEach((theWatcher) => {
-       theWatcher.close();
-     });
-     this._watcher.close();
-     this._watcher = null;
-     // I hope there's no queued events.
-     this._entries = null;
-     this._dirs = null;
+    if (this._closed) {
+      return;
+    }
+    this._watcher.removeListener('change', this._changeListener);
+    this._watcher.removeListener('error', this._errorListener);
+    this._dirs.forEach((theWatcher) => {
+      theWatcher.close();
+    });
+    this._watcher.close();
+    this._watcher = null;
+    // I hope there's no queued events.
+    this._entries = null;
+    this._dirs = null;
+    this._closed = true;
   }
 
   _start() {
-     this._watcher = fs.watch(this._filePath, this._options, (event, filename) => {
-       if (!filename) {
-         // it's going to be slow but what can we do?
-         _scan();
-       } else {
-         switch (event) {
-           case 'rename': // happens
-             this._checkFile(filename);
-             break;
-           case 'change':
-             this._checkFile(filename);
-             break;
-           default:
-             throw 'should never get here';
-         }
-       }
-     });
-     this._scan(this._options.addOrCreate);
+    this._changeListener = this.__proto__._onChange.bind(this);;
+    this._errorListener = this.__proto__._onError.bind(this);
+    this._watcher = fs.watch(this._filePath, this._options);
+    this._watcher.on('change', this._changeListener);
+    this._watcher.on('error', this._errorListener);
+    this._scan(this._options.addOrCreate);
+  }
+
+  _onChange(event, filename) {
+    debug("ONCHANGE:", event, filename);
+    if (!filename) {
+      // it's going to be slow but what can we do?
+      _scan();
+    } else {
+      switch (event) {
+        case 'rename': // happens
+          this._checkFile(filename);
+          break;
+        case 'change':
+          this._checkFile(filename);
+          break;
+        default:
+          throw 'should never get here';
+      }
+    }
+  }
+
+  _onError(err) {
+    debug("ONERROR:", this._filePath);
+    // not really sure what errors to check for here
+    if (err.code === 'EPERM') {
+      this._removeAll();
+    } else {
+      throw err;
+    }
   }
 
   _scan(addOrCreate) {
-     fs.readdir(this._filePath, (err, fileNames) => {
-       if (err) {
-         this.emit('error', 'error ' + err + ': ' + filePath);
-       } else {
-         fileNames = fileNames.filter(this._filter);
-         // Check removed
-         this._entries.forEach((state, entryPath) => {
-           if (fileNames.indexOf(entryPath) < 0) {
-             this.emit('remove', entryPath, stat);
-           }
-         });
+    fs.readdir(this._filePath, (err, fileNames) => {
+      if (err) {
+        this.emit('error', 'error ' + err + ': ' + filePath);
+      } else {
+        fileNames = fileNames.filter(this._filter);
+        // Check removed
+        this._entries.forEach((state, entryPath) => {
+          if (fileNames.indexOf(entryPath) < 0) {
+            this.emit('remove', entryPath, stat);
+          }
+        });
 
-         fileNames.forEach((fileName) => {
-           this._checkFile(fileName, addOrCreate);
-         });
-       }
-     });
+        fileNames.forEach((fileName) => {
+          this._checkFile(fileName, addOrCreate);
+        });
+      }
+    });
   }
 
   _checkFile(fileName, addOrCreate) {
@@ -125,6 +154,10 @@ class TheWatcher extends EventEmitter {
   }
 
   _removeAll() {
+    debug("REMOVEALL:", this._filePath);
+    if (this._closed) {
+      return;
+    }
     // first files
     this._dirs.forEach((watcher) => {
       watcher._removeAll();
