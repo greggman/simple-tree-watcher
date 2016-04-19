@@ -1,17 +1,14 @@
-var debug;
-try {
-  debug = require('debug')('thewatcher-test');
-} catch (e) {
-  debug = () => {};  // eslint-disable-line
-  debug = console.log.bind(console);  // eslint-disable-line
-}
-var assert     = require('assert');
-var fs         = require('fs');
-var path       = require('path');
-var TheWatcher = require('../index.js');
+'use strict';
+
+const debug         = require('../lib/debug')('thewatcher-test');  // eslint-disable-line
+const assert        = require('assert');
+const fs            = require('fs');
+const path          = require('path');
+const TheWatcher    = require('../index.js');
+const EventRecorder = require('../test-lib/event-recorder');
+const TestFS        = require('../test-lib/test-fs');
 
 describe('TheWatcher', function() {
-  "use strict";
 
   // NOTE: We use the real filesystem because we need to test
   // across plaforms that it works on those actual platforms.
@@ -19,8 +16,6 @@ describe('TheWatcher', function() {
   var tempDir = path.join(__dirname, "temp");
   var tempDir2 = path.join(__dirname, "temp2");
   var tempDir3 = path.join(__dirname, "temp/temp2");
-  var createdFiles = [];
-  var createdDirs = [];
   var newFiles;
   var newDirs;
   var initialContent = "abc";
@@ -31,45 +26,7 @@ describe('TheWatcher', function() {
   var nameOfSub = path.join(tempDir, "sub1", "sub3");
   var nameAtSub = path.join(nameOfSub, "moo3.txt");
   var timeout = 1000;
-
-  function writeFile(path, content) {
-    fs.writeFileSync(path, content, {encoding: "utf8"});
-    createdFiles.push(path);
-  }
-
-  function mkdir(path) {
-    fs.mkdirSync(path);
-    createdDirs.push(path);
-  }
-
-  function makeFS(dirName, spec) {
-    mkdir(dirName);
-    spec.files.forEach((fileName) => {
-      var fullPath = path.join(dirName, fileName);
-      writeFile(fullPath, initialContent);
-    });
-    if (spec.dirs) {
-      spec.dirs.forEach((dirSpec) => {
-        makeFS(path.join(dirName, dirSpec.name), dirSpec);
-      });
-    }
-  }
-
-  function mv(src, dst) {
-    debug("mv:", src, dst);
-    fs.renameSync(src, dst);
-
-    function subName(fileName) {
-      var newPath = fileName;
-      if (fileName.substr(0, src.length) === src) {
-        newPath = dst + fileName.substr(src.length);
-      }
-      return newPath;
-    }
-
-    createdFiles = createdFiles.map(subName);
-    createdDirs = createdDirs.map(subName);
-  }
+  var testFS = new TestFS();
 
   function notIn2(array1, array2) {
     var a2Set = new Set(array2);
@@ -83,7 +40,7 @@ describe('TheWatcher', function() {
   }
 
   before(function(done) {
-    makeFS(tempDir, {
+    testFS.makeFS(tempDir, {
       files: [
         "foo.txt",
         "bar.js",
@@ -112,22 +69,13 @@ describe('TheWatcher', function() {
           ],
         },
       ],
-    });
+    }, initialContent);
     done();
   });
 
   after(function(done) {
     theWatcher.close();
-    createdFiles.reverse().forEach(function(fileName) {
-      if (fs.existsSync(fileName)) {
-        fs.unlinkSync(fileName);
-      }
-    });
-    createdDirs.reverse().forEach(function(fileName) {
-      if (fs.existsSync(fileName)) {
-        fs.rmdirSync(fileName);
-      }
-    });
+    testFS.cleanup();
     done();
   });
 
@@ -160,61 +108,7 @@ describe('TheWatcher', function() {
   //  return watcher._entries.get(path.basename(dir));
   //}
 
-  function Recorder() {
-    var events;
-    var checkFn;
-
-    function record(event, name, stat, oldStat) {
-      debug("event:", event, name, stat.size);
-      var e = {
-        event: event,
-        name: name,
-        stat: stat,
-        oldStat: oldStat,
-        id: events.length,
-      };
-      events.push(e);
-      checkFn(e);
-    }
-
-    function clear() {
-      events = [];
-      checkFn = () => {};
-    }
-
-    function setCheck(fn) {
-      checkFn = fn;
-    }
-
-    function getEvents(type, filename) {
-      if (type && filename) {
-        return events.filter(function(e) {
-          return e.event === type && e.name === filename;
-        });
-      } else if (type) {
-        return events.filter(function(e) {
-          return e.event === type;
-        });
-      }
-      return events;
-    }
-
-    function showEvents() {
-      events.forEach((e) => {
-        debug(e.id, e.event, e.name);
-      });
-    }
-
-    this.clear = clear;
-    this.getEvents = getEvents;
-    this.record = record;
-    this.setCheck = setCheck;
-    this.showEvents = showEvents;
-
-    clear();
-  }
-
-  recorder = new Recorder();
+  recorder = new EventRecorder();
 
   // check tracking counts
 
@@ -235,14 +129,14 @@ describe('TheWatcher', function() {
         assert.ok(!added.has(e.name));
         added.set(e.name);
         if (e.stat.isDirectory()) {
-          assert.ok(createdDirs.indexOf(e.name) >= 0, 'should be directory');
+          assert.ok(testFS.createdDirs.indexOf(e.name) >= 0, 'should be directory');
         } else {
-          assert.ok(createdFiles.indexOf(e.name) >= 0, 'should be file');
+          assert.ok(testFS.createdFiles.indexOf(e.name) >= 0, 'should be file');
           assert.equal(e.stat.size, initialContent.length);
         }
       });
       // -1 because the root is in the list
-      assert.equal(added.size, createdDirs.length + createdFiles.length - 1);
+      assert.equal(added.size, testFS.createdDirs.length + testFS.createdFiles.length - 1);
       assert.ok(!added.has(tempDir));
       assert.equal(getWatcherDir("")._entries.size, 4);
       assert.equal(getWatcherDir("")._dirs.size, 1);
@@ -276,7 +170,7 @@ describe('TheWatcher', function() {
       assert.equal(e.name, nameAtRoot, 'name is ' + nameAtRoot);
       assert.equal(e.stat.size, initialContent.length);
     });
-    writeFile(nameAtRoot, initialContent);
+    testFS.writeFile(nameAtRoot, initialContent);
   });
 
   it('reports file changed at root', function(done) {
@@ -293,7 +187,7 @@ describe('TheWatcher', function() {
       noMoreEvents();
       done();
     }, timeout);
-    writeFile(nameAtRoot, newContent);
+    testFS.writeFile(nameAtRoot, newContent);
   });
 
   it('reports file removed from root', function(done) {
@@ -333,7 +227,7 @@ describe('TheWatcher', function() {
       noMoreEvents();
       done();
     }, timeout);
-    mkdir(nameOfSub);
+    testFS.mkdir(nameOfSub);
   });
 
   it('reports file added to subfolder', function(done) {
@@ -363,7 +257,7 @@ describe('TheWatcher', function() {
       assert.equal(getWatcherDir("sub1/sub3")._dirs.size, 0);
       done();
     }, timeout);
-    writeFile(nameAtSub, initialContent);
+    testFS.writeFile(nameAtSub, initialContent);
   });
 
   it('reports file changed at subfolder', function(done) {
@@ -381,7 +275,7 @@ describe('TheWatcher', function() {
       noMoreEvents();
       done();
     }, timeout);
-    writeFile(nameAtSub, newContent);
+    testFS.writeFile(nameAtSub, newContent);
   });
 
   it('reports file removed from subfolder', function(done) {
@@ -418,10 +312,10 @@ describe('TheWatcher', function() {
   });
 
   it('reports added existing subfolder in correct order', function(done) {
-    var existingFiles = createdFiles.slice();
-    var existingDirs  = createdDirs.slice();
+    var existingFiles = testFS.createdFiles.slice();
+    var existingDirs  = testFS.createdDirs.slice();
 
-    makeFS(tempDir2, {
+    testFS.makeFS(tempDir2, {
       files: [
         "foo-b.txt",
         "bar-b.js",
@@ -436,11 +330,11 @@ describe('TheWatcher', function() {
           ],
         },
       ],
-    });
+    }, initialContent);
 
     setTimeout(() => {
-      newFiles = diff(existingFiles, createdFiles);
-      newDirs = diff(existingDirs, createdDirs);
+      newFiles = diff(existingFiles, testFS.createdFiles);
+      newDirs = diff(existingDirs, testFS.createdDirs);
       assert.equal(newFiles.length, 5);
       assert.equal(newDirs.length, 2);
 
@@ -470,7 +364,7 @@ describe('TheWatcher', function() {
       noMoreEvents();
       done();
     }, timeout);
-    mv(tempDir2, tempDir3);
+    testFS.mv(tempDir2, tempDir3);
   });
 
   it('reports removed non-empty subfolder in correct order', function(done) {
@@ -494,23 +388,7 @@ describe('TheWatcher', function() {
       noMoreEvents();
       done();
     }, timeout);
-    mv(tempDir3, tempDir2);
-  });
-
-  it('ignores dot files', function(done) {
-      done();
-  });
-
-  it('ignores globs', function(done) {
-      done();
-  });
-
-  it('ignores regex', function(done) {
-      done();
-  });
-
-  it('ignores functions', function(done) {
-      done();
+    testFS.mv(tempDir3, tempDir2);
   });
 
 });
