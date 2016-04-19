@@ -52,11 +52,13 @@ class TestFS {
   cleanup() {
     this.createdFiles.reverse().forEach(function(fileName) {
       if (fs.existsSync(fileName)) {
+        debug("rm:", fileName);
         fs.unlinkSync(fileName);
       }
     });
     this.createdDirs.reverse().forEach(function(fileName) {
       if (fs.existsSync(fileName)) {
+        debug("rmdir:", fileName);
         fs.rmdirSync(fileName);
       }
     });
