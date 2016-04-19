@@ -7,7 +7,7 @@ const TheWatcher    = require('../index.js');
 const EventRecorder = require('../test-lib/event-recorder');
 const TestFS        = require('../test-lib/test-fs');
 
-describe('TheWatcher - filtering', function() {
+describe('TheWatcher - filtering:', function() {
 
   // NOTE: We use the real filesystem because we need to test
   // across plaforms that it works on those actual platforms.
@@ -21,20 +21,19 @@ describe('TheWatcher - filtering', function() {
   var testFS = new TestFS();
 
   function wait(fn) {
+    if (recorder) {
+      recorder.setCheck(() => {});
+    }
     setTimeout(fn, timeout);
   }
 
-  beforeEach(function(done) {
-    done();
-  });
-
-  after(function(done) {
+  function afterHelp(done) {
     theWatcher.close();
     testFS.cleanup();
     theWatcher = null;
     recorder = null;
-    done();
-  });
+    wait(done);
+  };
 
   function noMoreEvents() {
     if (recorder) {
@@ -44,12 +43,13 @@ describe('TheWatcher - filtering', function() {
     }
   }
 
-  beforeEach(function() {
+  function beforeHelp(done) {
     noMoreEvents();
     if (recorder) {
       recorder.clear();
     }
-  });
+    done();
+  };
 
   function getWatcherDir(dir, watcher) {
     watcher = watcher || theWatcher;
@@ -97,10 +97,19 @@ describe('TheWatcher - filtering', function() {
     }, initialContent);
   }
 
-  describe('ignores dot files', function() {
+  describe('ignores dot files:', function() {
 
     var newDotFile = path.join(tempDir, "sub1", ".test");
     var newFolder = path.join(tempDir, "sub1", "stuff");
+
+    before((done) => {
+      beforeHelp(done);
+    });
+
+    after((done) => {
+      afterHelp(done);
+    });
+
 
     it('ignores dot files on start', (done) => {
       addFiles();
