@@ -60,6 +60,9 @@ class TestFS {
         fs.rmdirSync(fileName);
       }
     });
+
+    this.createdFiles = [];
+    this.createdDirs = [];
   }
 }
 
