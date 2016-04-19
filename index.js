@@ -1,12 +1,6 @@
-(function() {
 'use strict';
 
-var debug;
-try {
-  debug = require('debug')('thewatcher');
-} catch (e) {
-  debug = function() {};
-}
+const debug = require('./lib/debug')('thewatcher');
 const fs = require('fs');
 const EventEmitter = require('events');
 const path = require('path');
@@ -200,6 +194,4 @@ class TheWatcher extends EventEmitter {
 }
 
 module.exports = TheWatcher;
-
-}());
 
