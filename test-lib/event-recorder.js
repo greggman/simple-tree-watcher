@@ -7,6 +7,11 @@ function EventRecorder(watcher) {
 
   function record(event, name, stat, oldStat) {
     debug("event:", event, name, stat.size);
+    //if (oldStat) {
+    //  debug(oldStat.size === stat.size   ? "sizes same" : "sizes different");
+    //  debug(oldStat.mtime === stat.mtime ? "mtime same" : "mtime different");
+    //  debug("diff :", "oldsize:", oldStat.size, "newsize:", stat.size, "oldtime:", oldStat.mtime, "newtime:", stat.mtime);
+    //}
     var e = {
       event: event,
       name: name,
