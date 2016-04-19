@@ -9,7 +9,9 @@ module.exports = function(grunt) {
       lib: {
         src: [
           'index.js',
+          'lib',
           'test',
+          'test-lib',
         ],
         options: {
           configFile: 'build/conf/eslint.json',
