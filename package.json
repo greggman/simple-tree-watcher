@@ -24,7 +24,8 @@
   },
   "homepage": "https://github.com/greggman/thewatcher#readme",
   "files": [
-    "index.js"
+    "index.js",
+    "lib/debug.js"
   ],
   "devDependencies": {
     "debug": "^2.2.0",
