@@ -1,3 +1,9 @@
+var debug;
+try {
+  debug = require('debug')('thewatcher-test');
+} catch (e) {
+  debug = function() {};
+}
 var assert     = require('assert');
 var fs         = require('fs');
 var path       = require('path');
@@ -20,7 +26,7 @@ describe('TheWatcher', function() {
   var nameAtRoot = path.join(tempDir, "moo.txt");
   var nameOfSub = path.join(tempDir, "sub1", "sub3");
   var nameAtSub = path.join(nameOfSub, "moo3.txt");
-  var extraTime = 200;
+  var extraTime = 1000;
 
   function writeFile(path, content) {
     fs.writeFileSync(path, content, {encoding: "utf8"});
@@ -67,6 +73,7 @@ describe('TheWatcher', function() {
   });
 
   after(function(done) {
+    theWatcher.close();
     createdFiles.reverse().forEach(function(fileName) {
       if (fs.existsSync(fileName)) {
         fs.unlinkSync(fileName);
@@ -116,7 +123,7 @@ describe('TheWatcher', function() {
     clear();
 
     function record(event, name, stat, oldStat) {
-console.log("event:", event, name, stat.size);
+      debug("event:", event, name, stat.size);
       var e = {
         event: event,
         name: name,
@@ -165,40 +172,39 @@ console.log("event:", event, name, stat.size);
     theWatcher.on('change', function(n, s, o) { recorder.record('change', n, s, o); });
     theWatcher.on('remove', function(n, s, o) { recorder.record('remove', n, s, o); });
 
-    var added = new Map();
-    recorder.setCheck((e) => {
-      assert.equal(e.event, 'add', 'event must be add');
-      assert.ok(!added.has(e.name));
-      added.set(e.name);
-      if (e.stat.isDirectory()) {
-        assert.ok(createdDirs.indexOf(e.name) >= 0, 'should be directory');
-      } else {
-        assert.ok(createdFiles.indexOf(e.name) >= 0, 'should be file');
-        assert.equal(e.stat.size, initialContent.length);
-      }
-
-      if (added.size === createdDirs.length + createdFiles.length - 1) {
-        // give it 1/2 a second more for bad events to come in.
-        noMoreEvents();
-        setTimeout(function() {
-          assert.ok(!added.has(tempDir));
-          assert.equal(getWatcherDir("")._entries.size, 4);
-          assert.equal(getWatcherDir("")._dirs.size, 1);
-          assert.equal(getWatcherDir("sub1")._entries.size, 5);
-          assert.equal(getWatcherDir("sub1")._dirs.size, 1);
-          assert.equal(getWatcherDir("sub1/sub2")._entries.size, 5);
-          assert.equal(getWatcherDir("sub1/sub2")._dirs.size, 0);
-          done();
-        }, extraTime);
-      }
-    });
+    setTimeout(() => {
+      var added = new Map();
+      var events = recorder.getEvents();
+      events.forEach((e) => {
+        assert.equal(e.event, 'add', 'event must be add');
+        assert.ok(!added.has(e.name));
+        added.set(e.name);
+        if (e.stat.isDirectory()) {
+          assert.ok(createdDirs.indexOf(e.name) >= 0, 'should be directory');
+        } else {
+          assert.ok(createdFiles.indexOf(e.name) >= 0, 'should be file');
+          assert.equal(e.stat.size, initialContent.length);
+        }
+      });
+      // -1 because the root is in the list
+      assert.equal(added.size, createdDirs.length + createdFiles.length - 1);
+      assert.ok(!added.has(tempDir));
+      assert.equal(getWatcherDir("")._entries.size, 4);
+      assert.equal(getWatcherDir("")._dirs.size, 1);
+      assert.equal(getWatcherDir("sub1")._entries.size, 5);
+      assert.equal(getWatcherDir("sub1")._dirs.size, 1);
+      assert.equal(getWatcherDir("sub1/sub2")._entries.size, 5);
+      assert.equal(getWatcherDir("sub1/sub2")._dirs.size, 0);
+      noMoreEvents();
+      done();
+    }, extraTime);
   });
 
   it('reports file created to root', function(done) {
     // check we get create followed by optional change
     var receivedEvents = new Set();
     setTimeout(function() {
-      assert.ok(receivedEvents.has("create"), "must have created event");      
+      assert.ok(receivedEvents.has("create"), "must have created event");
       assert.equal(getWatcherDir("")._entries.size, 5);
       assert.equal(getWatcherDir("")._dirs.size, 1);
       noMoreEvents();
@@ -219,17 +225,19 @@ console.log("event:", event, name, stat.size);
   });
 
   it('reports file changed at root', function(done) {
-    recorder.setCheck((e) => {
-      assert.equal(e.event, 'change', 'event is "change"');
-      assert.equal(e.name, nameAtRoot, 'name is ' + nameAtRoot);
-      assert.equal(e.stat.size, newContent.length);
+    setTimeout(function() {
+      var events = recorder.getEvents();
+      // Check we got only change events
+      events.forEach((e) => {
+        assert.equal(e.event, 'change', 'event is "change"');
+        assert.equal(e.name, nameAtRoot, 'name is ' + nameAtRoot);
+        assert.equal(e.stat.size, newContent.length);
+      });
+      assert.equal(getWatcherDir("")._entries.size, 5);
+      assert.equal(getWatcherDir("")._dirs.size, 1);
       noMoreEvents();
-      setTimeout(function() {
-        assert.equal(getWatcherDir("")._entries.size, 5);
-        assert.equal(getWatcherDir("")._dirs.size, 1);
-        done();
-      }, extraTime);
-    });
+      done();
+    }, extraTime);
     writeFile(nameAtRoot, newContent);
   });
 
@@ -250,35 +258,50 @@ console.log("event:", event, name, stat.size);
 
   it('reports added subfolder', function(done) {
     assert.equal(getWatcherDir("sub1")._entries.size, 5);
-    recorder.setCheck((e) => {
-      assert.equal(e.event, 'create', 'event is "create"');
-      assert.equal(e.name, nameOfSub, 'name is ' + nameOfSub);
-      assert.ok(e.stat.isDirectory());
-      setTimeout(function() {
-        noMoreEvents();
-        assert.equal(getWatcherDir("sub1")._entries.size, 6);
-        assert.equal(getWatcherDir("sub1")._dirs.size, 2);
-        done();
-      }, extraTime);
-    });
+    // Windows adds change event for parent subfolder
+    setTimeout(function() {
+      var createEvents = recorder.getEvents('create');
+      assert.equal(createEvents.length, 1, "there is one create event");
+      assert.equal(createEvents[0].name, nameOfSub, 'name is ' + nameOfSub);
+      assert.ok(createEvents[0].stat.isDirectory());
+      var changeEvents = recorder.getEvents('change');
+      assert.equal(recorder.getEvents().length, createEvents.length + changeEvents.length, "there are only change and create events");
+      if (changeEvents.length) {
+        var parentPath = path.dirname(nameOfSub);
+        assert.equal(changeEvents.length, 1, "there is only one create event");
+        assert.equal(changeEvents[0].name, parentPath, 'name is ' + parentPath);
+        assert.ok(changeEvents[0].stat.isDirectory());
+      }
+
+      assert.equal(getWatcherDir("sub1")._entries.size, 6);
+      assert.equal(getWatcherDir("sub1")._dirs.size, 2);
+      noMoreEvents();
+      done();
+    }, extraTime);
     mkdir(nameOfSub);
   });
 
   it('reports file added to subfolder', function(done) {
     assert.equal(getWatcherDir("sub1/sub3")._entries.size, 0);
+    // OSX gets a created event for file
+    // Windows gets a created event for file and a changed event for parent folder
+    // Ubuntu gets a created event for file and a changed event for file
     setTimeout(() => {
       assert.equal(recorder.getEvents('create').length, 1, "there's one create event");
       var events = recorder.getEvents();
-      assert.ok(events.length <= 2, "there are at most 2 events");
+      assert.ok(events.length <= 3, "there are at most 3 events");
       if (events.length > 1) {
-        assert.equal(recorder.getEvents('change').length, 1, "other event is change");
+        assert.equal(recorder.getEvents('change').length, events.length - 1, "other events are change");
         assert.ok(recorder.getEvents('create')[0].id <
                   recorder.getEvents('change')[0].id, "create event came first");
       }
       events.forEach((e) => {
-        assert.equal(e.name, nameAtSub, 'name is ' + nameAtSub);
-        assert.equal(e.stat.size, initialContent.length);
-        assert.ok(!e.stat.isDirectory());
+        if (e.stat.isDirectory()) {
+          assert.equal(e.name, nameOfSub, 'name is ' + nameOfSub);
+        } else {
+          assert.equal(e.name, nameAtSub, 'name is ' + nameAtSub);
+          assert.equal(e.stat.size, initialContent.length);
+        }
       });
       noMoreEvents();
       assert.equal(getWatcherDir("sub1/sub3")._entries.size, 1);
@@ -290,17 +313,19 @@ console.log("event:", event, name, stat.size);
 
   it('reports file changed at subfolder', function(done) {
     assert.equal(getWatcherDir("sub1/sub3")._entries.size, 1);
-    recorder.setCheck((e) => {
-      assert.equal(e.event, 'change', 'event is "change"');
-      assert.equal(e.name, nameAtSub, 'name is ' + nameAtSub);
-      assert.equal(e.stat.size, newContent.length);
-      setTimeout(function() {
-        noMoreEvents();
-        assert.equal(getWatcherDir("sub1/sub3")._entries.size, 1);
-        assert.equal(getWatcherDir("sub1/sub3")._dirs.size, 0);
-        done();
-      }, extraTime);
-    });
+    // Check we got only change events
+    setTimeout(function() {
+      var events = recorder.getEvents();
+      events.forEach((e) => {
+        assert.equal(e.event, 'change', 'event is "change"');
+        assert.equal(e.name, nameAtSub, 'name is ' + nameAtSub);
+        assert.equal(e.stat.size, newContent.length);
+      });
+      assert.equal(getWatcherDir("sub1/sub3")._entries.size, 1);
+      assert.equal(getWatcherDir("sub1/sub3")._dirs.size, 0);
+      noMoreEvents();
+      done();
+    }, extraTime);
     writeFile(nameAtSub, newContent);
   });
 
