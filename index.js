@@ -6,6 +6,7 @@ try {
   debug = require('debug')('thewatcher');
 } catch (e) {
   debug = function() {};
+  debug = console.log.bind(console);  // eslint-disable-line
 }
 const fs = require('fs');
 const EventEmitter = require('events');

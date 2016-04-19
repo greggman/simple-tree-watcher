@@ -2,7 +2,8 @@ var debug;
 try {
   debug = require('debug')('thewatcher-test');
 } catch (e) {
-  debug = function() {};
+  debug = () => {};  // eslint-disable-line
+  debug = console.log.bind(console);  // eslint-disable-line
 }
 var assert     = require('assert');
 var fs         = require('fs');
@@ -16,7 +17,7 @@ describe('TheWatcher', function() {
   // across plaforms that it works on those actual platforms.
   // I'm too lazy to make a tmpdir with some modules so ...
   var tempDir = path.join(__dirname, "temp");
-  var tempDir2 = path.join(__dirname, "temp2");
+  //var tempDir2 = path.join(__dirname, "temp2");
   var createdFiles = [];
   var createdDirs = [];
   var initialContent = "abc";
@@ -26,7 +27,7 @@ describe('TheWatcher', function() {
   var nameAtRoot = path.join(tempDir, "moo.txt");
   var nameOfSub = path.join(tempDir, "sub1", "sub3");
   var nameAtSub = path.join(nameOfSub, "moo3.txt");
-  var extraTime = 500;
+  var extraTime = 1000;
 
   function writeFile(path, content) {
     fs.writeFileSync(path, content, {encoding: "utf8"});
@@ -36,6 +37,19 @@ describe('TheWatcher', function() {
   function mkdir(path) {
     fs.mkdirSync(path);
     createdDirs.push(path);
+  }
+
+  function makeFS(dirName, spec) {
+    mkdir(dirName);
+    spec.files.forEach((fileName) => {
+      var fullPath = path.join(dirName, fileName);
+      writeFile(fullPath, initialContent);
+    });
+    if (spec.dirs) {
+      spec.dirs.forEach((dirSpec) => {
+        makeFS(path.join(dirName, dirSpec.name), dirSpec);
+      });
+    }
   }
 
   before(function(done) {
@@ -81,7 +95,7 @@ describe('TheWatcher', function() {
     });
     createdDirs.reverse().forEach(function(fileName) {
       if (fs.existsSync(fileName)) {
-        fs.rmdirSync(fileName)  ;
+        fs.rmdirSync(fileName);
       }
     });
     done();
@@ -111,16 +125,14 @@ describe('TheWatcher', function() {
     }
   }
 
-  function getWatcherEntry(fileName, watcher) {
-    watcher = getWatcherDir(path.dirname(fileName));
-    return watcher._entries.get(path.basename(dir));
-  }
+  //function getWatcherEntry(fileName, watcher) {
+  //  watcher = getWatcherDir(path.dirname(fileName));
+  //  return watcher._entries.get(path.basename(dir));
+  //}
 
   function Recorder() {
     var events;
     var checkFn;
-
-    clear();
 
     function record(event, name, stat, oldStat) {
       debug("event:", event, name, stat.size);
@@ -157,6 +169,8 @@ describe('TheWatcher', function() {
     this.getEvents = getEvents;
     this.record = record;
     this.setCheck = setCheck;
+
+    clear();
   }
 
   recorder = new Recorder();
@@ -167,10 +181,10 @@ describe('TheWatcher', function() {
   // at the time how to make them both simple and not be a pita
   it('reports existing files', function(done) {
     theWatcher = new TheWatcher(tempDir);
-    theWatcher.on('add',    function(n, s, o) { recorder.record('add',    n, s, o); });
-    theWatcher.on('create', function(n, s, o) { recorder.record('create', n, s, o); });
-    theWatcher.on('change', function(n, s, o) { recorder.record('change', n, s, o); });
-    theWatcher.on('remove', function(n, s, o) { recorder.record('remove', n, s, o); });
+    theWatcher.on('add',    function(n, s, o) { recorder.record('add',    n, s, o); });  // eslint-disable-line
+    theWatcher.on('create', function(n, s, o) { recorder.record('create', n, s, o); });  // eslint-disable-line
+    theWatcher.on('change', function(n, s, o) { recorder.record('change', n, s, o); });  // eslint-disable-line
+    theWatcher.on('remove', function(n, s, o) { recorder.record('remove', n, s, o); });  // eslint-disable-line
 
     setTimeout(() => {
       var added = new Map();
@@ -385,19 +399,6 @@ describe('TheWatcher', function() {
   it('ignores functions', function(done) {
       done();
   });
-
-  function makeFS(dirName, spec) {
-    mkdir(dirName);
-    spec.files.forEach((fileName) => {
-      var fullPath = path.join(dirName, fileName);
-      writeFile(fullPath, initialContent);
-    });
-    if (spec.dirs) {
-      spec.dirs.forEach((dirSpec) => {
-        makeFS(path.join(dirName, dirSpec.name), dirSpec);
-      });
-    }
-  }
 
 });
 
