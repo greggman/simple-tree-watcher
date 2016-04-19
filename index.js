@@ -104,7 +104,9 @@ class TheWatcher extends EventEmitter {
       if (err) {
         this.emit('error', 'error ' + err + ': ' + filePath);
       } else {
-        fileNames = fileNames.filter(this._filter);
+        fileNames = fileNames.filter((fileName) => {
+          return this._filter(path.join(this._filePath, fileName));
+        });
         // Check removed
         this._entries.forEach((state, entryPath) => {
           if (fileNames.indexOf(entryPath) < 0) {
