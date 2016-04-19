@@ -26,7 +26,7 @@ describe('TheWatcher', function() {
   var nameAtRoot = path.join(tempDir, "moo.txt");
   var nameOfSub = path.join(tempDir, "sub1", "sub3");
   var nameAtSub = path.join(nameOfSub, "moo3.txt");
-  var extraTime = 1000;
+  var extraTime = 500;
 
   function writeFile(path, content) {
     fs.writeFileSync(path, content, {encoding: "utf8"});
