@@ -39,6 +39,10 @@ describe('TheWatcher', function() {
     return notIn2(array1, array2).concat(notIn2(array2, array1));
   }
 
+  function wait(fn) {
+    setTimeout(fn, timeout);
+  }
+
   before(function(done) {
     testFS.makeFS(tempDir, {
       files: [
@@ -80,14 +84,18 @@ describe('TheWatcher', function() {
   });
 
   function noMoreEvents() {
-    recorder.setCheck((e) => {
-      assert.ok(false, 'no events should happen. got: "' + e.event + '" event for ' + e.name + (e.stat.isDirectory() ? ' directory' : (', size: ' + e.stat.size + (e.oldStat ? (', oldSize: ' + e.oldStat.size) : ''))));
-    });
+    if (recorder) {
+      recorder.setCheck((e) => {
+        assert.ok(false, 'no events should happen. got: "' + e.event + '" event for ' + e.name + (e.stat.isDirectory() ? ' directory' : (', size: ' + e.stat.size + (e.oldStat ? (', oldSize: ' + e.oldStat.size) : ''))));
+      });
+    }
   }
 
   beforeEach(function() {
     noMoreEvents();
-    recorder.clear();
+    if (recorder) {
+      recorder.clear();
+    }
   });
 
   function getWatcherDir(dir, watcher) {
@@ -103,25 +111,13 @@ describe('TheWatcher', function() {
     }
   }
 
-  //function getWatcherEntry(fileName, watcher) {
-  //  watcher = getWatcherDir(path.dirname(fileName));
-  //  return watcher._entries.get(path.basename(dir));
-  //}
-
-  recorder = new EventRecorder();
-
-  // check tracking counts
-
   // yes I know these tests are dependent but it wasn't clear to me
   // at the time how to make them both simple and not be a pita
-  it('reports existing files', function(done) {
+  it('reports existing files', (done) => {
     theWatcher = new TheWatcher(tempDir);
-    theWatcher.on('add',    function(n, s, o) { recorder.record('add',    n, s, o); });  // eslint-disable-line
-    theWatcher.on('create', function(n, s, o) { recorder.record('create', n, s, o); });  // eslint-disable-line
-    theWatcher.on('change', function(n, s, o) { recorder.record('change', n, s, o); });  // eslint-disable-line
-    theWatcher.on('remove', function(n, s, o) { recorder.record('remove', n, s, o); });  // eslint-disable-line
+    recorder = new EventRecorder(theWatcher);
 
-    setTimeout(() => {
+    wait(() => {
       var added = new Map();
       var events = recorder.getEvents();
       events.forEach((e) => {
@@ -146,19 +142,19 @@ describe('TheWatcher', function() {
       assert.equal(getWatcherDir("sub1/sub2")._dirs.size, 0);
       noMoreEvents();
       done();
-    }, timeout);
+    });
   });
 
-  it('reports file created to root', function(done) {
+  it('reports file created to root', (done) => {
     // check we get create followed by optional change
     var receivedEvents = new Set();
-    setTimeout(() => {
+    wait(() => {
       assert.ok(receivedEvents.has("create"), "must have created event");
       assert.equal(getWatcherDir("")._entries.size, 5);
       assert.equal(getWatcherDir("")._dirs.size, 1);
       noMoreEvents();
       done();
-    }, timeout);
+    });
     recorder.setCheck((e) => {
       if (!receivedEvents.has('create')) {
         assert.equal(e.event, 'create', 'event is "create"');
@@ -173,8 +169,8 @@ describe('TheWatcher', function() {
     testFS.writeFile(nameAtRoot, initialContent);
   });
 
-  it('reports file changed at root', function(done) {
-    setTimeout(() => {
+  it('reports file changed at root', (done) => {
+    wait(() => {
       var events = recorder.getEvents();
       // Check we got only change events
       events.forEach((e) => {
@@ -186,29 +182,29 @@ describe('TheWatcher', function() {
       assert.equal(getWatcherDir("")._dirs.size, 1);
       noMoreEvents();
       done();
-    }, timeout);
+    });
     testFS.writeFile(nameAtRoot, newContent);
   });
 
-  it('reports file removed from root', function(done) {
+  it('reports file removed from root', (done) => {
     recorder.setCheck((e) => {
       assert.equal(e.event, 'remove', 'event is "remove"');
       assert.equal(e.name, nameAtRoot, 'name is ' + nameAtRoot);
       assert.equal(e.stat.size, newContent.length);
       noMoreEvents();
-      setTimeout(() => {
+      wait(() => {
         assert.equal(getWatcherDir("")._entries.size, 4);
         assert.equal(getWatcherDir("")._dirs.size, 1);
         done();
-      }, timeout);
+      });
     });
     fs.unlinkSync(nameAtRoot);
   });
 
-  it('reports added subfolder', function(done) {
+  it('reports added subfolder', (done) => {
     assert.equal(getWatcherDir("sub1")._entries.size, 5);
     // Windows adds change event for parent subfolder
-    setTimeout(() => {
+    wait(() => {
       var createEvents = recorder.getEvents('create');
       assert.equal(createEvents.length, 1, "there is one create event");
       assert.equal(createEvents[0].name, nameOfSub, 'name is ' + nameOfSub);
@@ -226,16 +222,16 @@ describe('TheWatcher', function() {
       assert.equal(getWatcherDir("sub1")._dirs.size, 2);
       noMoreEvents();
       done();
-    }, timeout);
+    });
     testFS.mkdir(nameOfSub);
   });
 
-  it('reports file added to subfolder', function(done) {
+  it('reports file added to subfolder', (done) => {
     assert.equal(getWatcherDir("sub1/sub3")._entries.size, 0);
     // OSX gets a created event for file
     // Windows gets a created event for file and a changed event for parent folder
     // Ubuntu gets a created event for file and a changed event for file
-    setTimeout(() => {
+    wait(() => {
       assert.equal(recorder.getEvents('create').length, 1, "there's one create event");
       var events = recorder.getEvents();
       assert.ok(events.length <= 3, "there are at most 3 events");
@@ -256,14 +252,14 @@ describe('TheWatcher', function() {
       assert.equal(getWatcherDir("sub1/sub3")._entries.size, 1);
       assert.equal(getWatcherDir("sub1/sub3")._dirs.size, 0);
       done();
-    }, timeout);
+    });
     testFS.writeFile(nameAtSub, initialContent);
   });
 
-  it('reports file changed at subfolder', function(done) {
+  it('reports file changed at subfolder', (done) => {
     assert.equal(getWatcherDir("sub1/sub3")._entries.size, 1);
     // Check we got only change events
-    setTimeout(() => {
+    wait(() => {
       var events = recorder.getEvents();
       events.forEach((e) => {
         assert.equal(e.event, 'change', 'event is "change"');
@@ -274,44 +270,44 @@ describe('TheWatcher', function() {
       assert.equal(getWatcherDir("sub1/sub3")._dirs.size, 0);
       noMoreEvents();
       done();
-    }, timeout);
+    });
     testFS.writeFile(nameAtSub, newContent);
   });
 
-  it('reports file removed from subfolder', function(done) {
+  it('reports file removed from subfolder', (done) => {
     assert.equal(getWatcherDir("sub1/sub3")._entries.size, 1);
     recorder.setCheck((e) => {
       assert.equal(e.event, 'remove', 'event is "remove"');
       assert.equal(e.name, nameAtSub, 'name is ' + nameAtSub);
       assert.equal(e.stat.size, newContent.length);
-      setTimeout(() => {
+      wait(() => {
         noMoreEvents();
         assert.equal(getWatcherDir("sub1/sub3")._entries.size, 0);
         assert.equal(getWatcherDir("sub1/sub3")._dirs.size, 0);
         done();
-      }, timeout);
+      });
     });
     fs.unlinkSync(nameAtSub);
   });
 
-  it('reports sub folder removed from subfolder', function(done) {
+  it('reports sub folder removed from subfolder', (done) => {
     assert.equal(getWatcherDir("sub1")._entries.size, 6);
     assert.equal(getWatcherDir("sub1")._dirs.size, 2);
     recorder.setCheck((e) => {
       assert.equal(e.event, 'remove', 'event is "remove"');
       assert.equal(e.name, nameOfSub, 'name is ' + nameOfSub);
       assert.ok(e.stat.isDirectory());
-      setTimeout(() => {
+      wait(() => {
         noMoreEvents();
         assert.equal(getWatcherDir("sub1")._entries.size, 5);
         assert.equal(getWatcherDir("sub1")._dirs.size, 1);
         done();
-      }, timeout);
+      });
     });
     fs.rmdirSync(nameOfSub);
   });
 
-  it('reports added existing subfolder in correct order', function(done) {
+  it('reports added existing subfolder in correct order', (done) => {
     var existingFiles = testFS.createdFiles.slice();
     var existingDirs  = testFS.createdDirs.slice();
 
@@ -332,7 +328,7 @@ describe('TheWatcher', function() {
       ],
     }, initialContent);
 
-    setTimeout(() => {
+    wait(() => {
       newFiles = diff(existingFiles, testFS.createdFiles);
       newDirs = diff(existingDirs, testFS.createdDirs);
       assert.equal(newFiles.length, 5);
@@ -363,12 +359,12 @@ describe('TheWatcher', function() {
       });
       noMoreEvents();
       done();
-    }, timeout);
+    });
     testFS.mv(tempDir2, tempDir3);
   });
 
-  it('reports removed non-empty subfolder in correct order', function(done) {
-    setTimeout(() => {
+  it('reports removed non-empty subfolder in correct order', (done) => {
+    wait(() => {
       recorder.showEvents();
       var tempEvents = recorder.getEvents('remove', tempDir3);
       assert.equal(tempEvents.length, 1, "there's an event for temp2");
@@ -387,7 +383,7 @@ describe('TheWatcher', function() {
       });
       noMoreEvents();
       done();
-    }, timeout);
+    });
     testFS.mv(tempDir3, tempDir2);
   });
 
