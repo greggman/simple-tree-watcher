@@ -33,7 +33,7 @@ describe('TheWatcher - filtering:', function() {
     theWatcher = null;
     recorder = null;
     wait(done);
-  };
+  }
 
   function noMoreEvents() {
     if (recorder) {
@@ -49,7 +49,7 @@ describe('TheWatcher - filtering:', function() {
       recorder.clear();
     }
     done();
-  };
+  }
 
   function getWatcherDir(dir, watcher) {
     watcher = watcher || theWatcher;
