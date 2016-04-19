@@ -53,6 +53,10 @@ class TheWatcher extends EventEmitter {
   }
 
   _start() {
+    // because this is async we mind be closed before this fires
+    if (this._closed) {
+      return;
+    }
     var proto = Object.getPrototypeOf(this);
     this._changeListener = proto._onChange.bind(this);
     this._errorListener = proto._onError.bind(this);
@@ -93,6 +97,10 @@ class TheWatcher extends EventEmitter {
 
   _scan(addOrCreate) {
     fs.readdir(this._filePath, (err, fileNames) => {
+      // because this is async we might be closed when this fires
+      if (this._closed) {
+        return;
+      }
       if (err) {
         this.emit('error', 'error ' + err + ': ' + filePath);
       } else {
@@ -112,9 +120,18 @@ class TheWatcher extends EventEmitter {
   }
 
   _checkFile(fileName, addOrCreate) {
+    // how am I getting here if this is done? Looks like I'm getting notification for self.?
+    if (this._closed) {
+      debug("_checkFileC called after closed!??!");
+      return;
+    }
     addOrCreate = addOrCreate || 'create';
     var fullPath = path.join(this._filePath, fileName);
     fs.stat(fullPath, (err, stats) => {
+      // Because this is async we might be closed when this gets back
+      if (this._closed) {
+        return;
+      }
       var oldStats = this._entries.get(fileName);
       var oldDir = this._dirs.get(fileName);
       if (err) {
@@ -144,6 +161,7 @@ class TheWatcher extends EventEmitter {
           options.addOrCreate = addOrCreate;
           var watcher = new TheWatcher(fullPath, options);
           ['add', 'create', 'remove', 'change'].forEach((event) => {
+            // We need arguments so we can't use => and ... is not yet supported
             watcher.on(event, function() {
               this._propogateEvent(event, arguments);
             }.bind(this));
