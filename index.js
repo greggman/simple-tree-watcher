@@ -6,7 +6,6 @@ try {
   debug = require('debug')('thewatcher');
 } catch (e) {
   debug = function() {};
-  debug = console.log.bind(console);  // eslint-disable-line
 }
 const fs = require('fs');
 const EventEmitter = require('events');
@@ -143,7 +142,7 @@ class TheWatcher extends EventEmitter {
         if (scan && stats.isDirectory()) {
           var options = shallowCopy(this._options);
           options.addOrCreate = addOrCreate;
-          var watcher = new TheWatcher(fullPath, this._options);
+          var watcher = new TheWatcher(fullPath, options);
           ['add', 'create', 'remove', 'change'].forEach((event) => {
             watcher.on(event, function() {
               this._propogateEvent(event, arguments);
