@@ -17,9 +17,12 @@ describe('TheWatcher', function() {
   // across plaforms that it works on those actual platforms.
   // I'm too lazy to make a tmpdir with some modules so ...
   var tempDir = path.join(__dirname, "temp");
-  //var tempDir2 = path.join(__dirname, "temp2");
+  var tempDir2 = path.join(__dirname, "temp2");
+  var tempDir3 = path.join(__dirname, "temp/temp2");
   var createdFiles = [];
   var createdDirs = [];
+  var newFiles;
+  var newDirs;
   var initialContent = "abc";
   var newContent = "abcdef";
   var theWatcher;
@@ -27,7 +30,7 @@ describe('TheWatcher', function() {
   var nameAtRoot = path.join(tempDir, "moo.txt");
   var nameOfSub = path.join(tempDir, "sub1", "sub3");
   var nameAtSub = path.join(nameOfSub, "moo3.txt");
-  var extraTime = 1000;
+  var timeout = 1000;
 
   function writeFile(path, content) {
     fs.writeFileSync(path, content, {encoding: "utf8"});
@@ -50,6 +53,33 @@ describe('TheWatcher', function() {
         makeFS(path.join(dirName, dirSpec.name), dirSpec);
       });
     }
+  }
+
+  function mv(src, dst) {
+    debug("mv:", src, dst);
+    fs.renameSync(src, dst);
+
+    function subName(fileName) {
+      var newPath = fileName;
+      if (fileName.substr(0, src.length) === src) {
+        newPath = dst + fileName.substr(src.length);
+      }
+      return newPath;
+    }
+
+    createdFiles = createdFiles.map(subName);
+    createdDirs = createdDirs.map(subName);
+  }
+
+  function notIn2(array1, array2) {
+    var a2Set = new Set(array2);
+    return array1.filter((elem) => {
+      return !a2Set.has(elem);
+    });
+  }
+
+  function diff(array1, array2) {
+    return notIn2(array1, array2).concat(notIn2(array2, array1));
   }
 
   before(function(done) {
@@ -156,8 +186,12 @@ describe('TheWatcher', function() {
       checkFn = fn;
     }
 
-    function getEvents(type) {
-      if (type) {
+    function getEvents(type, filename) {
+      if (type && filename) {
+        return events.filter(function(e) {
+          return e.event === type && e.name === filename;
+        });
+      } else if (type) {
         return events.filter(function(e) {
           return e.event === type;
         });
@@ -165,10 +199,17 @@ describe('TheWatcher', function() {
       return events;
     }
 
+    function showEvents() {
+      events.forEach((e) => {
+        debug(e.id, e.event, e.name);
+      });
+    }
+
     this.clear = clear;
     this.getEvents = getEvents;
     this.record = record;
     this.setCheck = setCheck;
+    this.showEvents = showEvents;
 
     clear();
   }
@@ -211,19 +252,19 @@ describe('TheWatcher', function() {
       assert.equal(getWatcherDir("sub1/sub2")._dirs.size, 0);
       noMoreEvents();
       done();
-    }, extraTime);
+    }, timeout);
   });
 
   it('reports file created to root', function(done) {
     // check we get create followed by optional change
     var receivedEvents = new Set();
-    setTimeout(function() {
+    setTimeout(() => {
       assert.ok(receivedEvents.has("create"), "must have created event");
       assert.equal(getWatcherDir("")._entries.size, 5);
       assert.equal(getWatcherDir("")._dirs.size, 1);
       noMoreEvents();
       done();
-    }, extraTime);
+    }, timeout);
     recorder.setCheck((e) => {
       if (!receivedEvents.has('create')) {
         assert.equal(e.event, 'create', 'event is "create"');
@@ -239,7 +280,7 @@ describe('TheWatcher', function() {
   });
 
   it('reports file changed at root', function(done) {
-    setTimeout(function() {
+    setTimeout(() => {
       var events = recorder.getEvents();
       // Check we got only change events
       events.forEach((e) => {
@@ -251,7 +292,7 @@ describe('TheWatcher', function() {
       assert.equal(getWatcherDir("")._dirs.size, 1);
       noMoreEvents();
       done();
-    }, extraTime);
+    }, timeout);
     writeFile(nameAtRoot, newContent);
   });
 
@@ -261,11 +302,11 @@ describe('TheWatcher', function() {
       assert.equal(e.name, nameAtRoot, 'name is ' + nameAtRoot);
       assert.equal(e.stat.size, newContent.length);
       noMoreEvents();
-      setTimeout(function() {
+      setTimeout(() => {
         assert.equal(getWatcherDir("")._entries.size, 4);
         assert.equal(getWatcherDir("")._dirs.size, 1);
         done();
-      }, extraTime);
+      }, timeout);
     });
     fs.unlinkSync(nameAtRoot);
   });
@@ -273,7 +314,7 @@ describe('TheWatcher', function() {
   it('reports added subfolder', function(done) {
     assert.equal(getWatcherDir("sub1")._entries.size, 5);
     // Windows adds change event for parent subfolder
-    setTimeout(function() {
+    setTimeout(() => {
       var createEvents = recorder.getEvents('create');
       assert.equal(createEvents.length, 1, "there is one create event");
       assert.equal(createEvents[0].name, nameOfSub, 'name is ' + nameOfSub);
@@ -291,7 +332,7 @@ describe('TheWatcher', function() {
       assert.equal(getWatcherDir("sub1")._dirs.size, 2);
       noMoreEvents();
       done();
-    }, extraTime);
+    }, timeout);
     mkdir(nameOfSub);
   });
 
@@ -321,14 +362,14 @@ describe('TheWatcher', function() {
       assert.equal(getWatcherDir("sub1/sub3")._entries.size, 1);
       assert.equal(getWatcherDir("sub1/sub3")._dirs.size, 0);
       done();
-    }, extraTime);
+    }, timeout);
     writeFile(nameAtSub, initialContent);
   });
 
   it('reports file changed at subfolder', function(done) {
     assert.equal(getWatcherDir("sub1/sub3")._entries.size, 1);
     // Check we got only change events
-    setTimeout(function() {
+    setTimeout(() => {
       var events = recorder.getEvents();
       events.forEach((e) => {
         assert.equal(e.event, 'change', 'event is "change"');
@@ -339,7 +380,7 @@ describe('TheWatcher', function() {
       assert.equal(getWatcherDir("sub1/sub3")._dirs.size, 0);
       noMoreEvents();
       done();
-    }, extraTime);
+    }, timeout);
     writeFile(nameAtSub, newContent);
   });
 
@@ -349,12 +390,12 @@ describe('TheWatcher', function() {
       assert.equal(e.event, 'remove', 'event is "remove"');
       assert.equal(e.name, nameAtSub, 'name is ' + nameAtSub);
       assert.equal(e.stat.size, newContent.length);
-      setTimeout(function() {
+      setTimeout(() => {
         noMoreEvents();
         assert.equal(getWatcherDir("sub1/sub3")._entries.size, 0);
         assert.equal(getWatcherDir("sub1/sub3")._dirs.size, 0);
         done();
-      }, extraTime);
+      }, timeout);
     });
     fs.unlinkSync(nameAtSub);
   });
@@ -366,22 +407,94 @@ describe('TheWatcher', function() {
       assert.equal(e.event, 'remove', 'event is "remove"');
       assert.equal(e.name, nameOfSub, 'name is ' + nameOfSub);
       assert.ok(e.stat.isDirectory());
-      setTimeout(function() {
+      setTimeout(() => {
         noMoreEvents();
         assert.equal(getWatcherDir("sub1")._entries.size, 5);
         assert.equal(getWatcherDir("sub1")._dirs.size, 1);
         done();
-      }, extraTime);
+      }, timeout);
     });
     fs.rmdirSync(nameOfSub);
   });
 
   it('reports added existing subfolder in correct order', function(done) {
+    var existingFiles = createdFiles.slice();
+    var existingDirs  = createdDirs.slice();
+
+    makeFS(tempDir2, {
+      files: [
+        "foo-b.txt",
+        "bar-b.js",
+        ".foo-b",
+      ],
+      dirs: [
+        {
+          name: "sub1-b",
+          files: [
+            "foo2a-b.txt",
+            "foo2b-b.txt",
+          ],
+        },
+      ],
+    });
+
+    setTimeout(() => {
+      newFiles = diff(existingFiles, createdFiles);
+      newDirs = diff(existingDirs, createdDirs);
+      assert.equal(newFiles.length, 5);
+      assert.equal(newDirs.length, 2);
+
+      var tempEvents = recorder.getEvents('create', tempDir3);
+      assert.equal(tempEvents.length, 1, "there's an event for temp2");
+      newFiles.forEach((fileName) => {
+        var events = recorder.getEvents('create', fileName);
+        assert.equal(events.length, 1, "there's one create event per file");
+        assert.equal(events[0].stat.size, initialContent.length);
+        assert.ok(events[0].id > tempEvents[0].id, "event came after subfolder");
+        var parentEvents = recorder.getEvents('create', path.dirname(fileName));
+        assert.equal(parentEvents.length, 1, "there's a create event for each parent");
+        assert.ok(parentEvents[0].id < events[0].id, "parent was created before file");
+      });
+      newDirs.forEach((fileName) => {
+        var events = recorder.getEvents('create', fileName);
+        assert.equal(events.length, 1, "there's one create event per dir");
+        assert.ok(events[0].stat.isDirectory());
+        // use >= because tempDir3 is on the list
+        assert.ok(events[0].id >= tempEvents[0].id, "event came after subfolder");
+        if (events[0].id > tempEvents[0].id) {
+          var parentEvents = recorder.getEvents('create', path.dirname(fileName));
+          assert.equal(parentEvents.length, 1, "there's a create event for each parent");
+          assert.ok(parentEvents[0].id < events[0].id, "parent was created before dir");
+        }
+      });
+      noMoreEvents();
       done();
+    }, timeout);
+    mv(tempDir2, tempDir3);
   });
 
   it('reports removed non-empty subfolder in correct order', function(done) {
+    setTimeout(() => {
+      recorder.showEvents();
+      var tempEvents = recorder.getEvents('remove', tempDir3);
+      assert.equal(tempEvents.length, 1, "there's an event for temp2");
+      newFiles.forEach((fileName) => {
+        var events = recorder.getEvents('remove', fileName);
+        assert.equal(events.length, 1, "there's one remove event per file");
+        assert.equal(events[0].stat.size, initialContent.length);
+        assert.ok(events[0].id < tempEvents[0].id, "event came before subfolder");
+      });
+      newDirs.forEach((fileName) => {
+        var events = recorder.getEvents('remove', fileName);
+        assert.equal(events.length, 1, "there's one remove event per dir");
+        assert.ok(events[0].stat.isDirectory());
+        // use >= because tempDir3 is on the list
+        assert.ok(events[0].id <= tempEvents[0].id, "event came before subfolder");
+      });
+      noMoreEvents();
       done();
+    }, timeout);
+    mv(tempDir3, tempDir2);
   });
 
   it('ignores dot files', function(done) {
