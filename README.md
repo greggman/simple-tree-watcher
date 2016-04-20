@@ -1,7 +1,7 @@
-TheWatcher
+SimpleTreeWatcher
 ==========
 
-[![Build Status](https://travis-ci.org/greggman/thewatcher.svg?branch=master)](https://travis-ci.org/greggman/thewatcher)
+[![Build Status](https://travis-ci.org/greggman/simple-tree-watcher.svg?branch=master)](https://travis-ci.org/greggman/simple-tree-watcher)
 
 Watches a directory tree for changes
 
@@ -10,16 +10,16 @@ Hopefully it actually works unlike other watch libaries
 ## Example:
 
 ```
-const TheWatcher = require('./index');
+const SimpleTreeWatcher = require('simple-tree-watcher');
 
 var dir = process.argv[2];
 console.log("watching: ", dir);
 
-theWatcher = new TheWatcher(dir);
-theWatcher.on('add',    function(f, s)     { show("add   :", f, s    ); });
-theWatcher.on('create', function(f, s)     { show("create:", f, s    ); });
-theWatcher.on('remove', function(f, s, s2) { show("remove:", f, s, s2); });
-theWatcher.on('change', function(f, s)     { show("change:", f, s    ); });
+var watcher = new SimpleTreeWatcher(dir);
+watcher.on('add',    function(f, s)     { show("add   :", f, s    ); });
+watcher.on('create', function(f, s)     { show("create:", f, s    ); });
+watcher.on('remove', function(f, s, s2) { show("remove:", f, s, s2); });
+watcher.on('change', function(f, s)     { show("change:", f, s    ); });
 
 function show(event, f, s, n) {
   console.log(event, f);
@@ -28,11 +28,11 @@ function show(event, f, s, n) {
 
 ## Docs
 
-create an instance of `TheWatcher` and attach events.
+create an instance of `SimpleTreeWatcher` and attach events.
 
-`new TheWatcher(path, options)`
+`new SimpleTreeWatcher(path, options)`
 
-`TheWatcher` is an `EventEmitter` so it has [the standard `EventEmitter` api](https://nodejs.org/api/events.html#events_class_eventemitter).
+`SimpleTreeWatcher` is an `EventEmitter` so it has [the standard `EventEmitter` api](https://nodejs.org/api/events.html#events_class_eventemitter).
 
 ### Events
 
@@ -58,7 +58,7 @@ Emitted when a file is change. Passed the filename, current stat, previous stat
 
 A function that is passed the path for every file and directory. It should return `true`
 to keep the file or directory or `false` to reject it. The path passed
-is relative to the original path when TheWatcher was created.
+is relative to the original path when `SimpleTreeWatcher` was created.
 
 ### Methods
 

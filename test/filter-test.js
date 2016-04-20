@@ -1,13 +1,13 @@
 'use strict';
 
-const debug         = require('../lib/debug')('thewatcher-test');  // eslint-disable-line
-const assert        = require('assert');
-const path          = require('path');
-const TheWatcher    = require('../index.js');
+const debug = require('../lib/debug')('filter-test');  // eslint-disable-line
+const assert = require('assert');
+const path = require('path');
+const SimpleTreeWatcher  = require('../index.js');
 const EventRecorder = require('../test-lib/event-recorder');
-const TestFS        = require('../test-lib/test-fs');
+const TestFS = require('../test-lib/test-fs');
 
-describe('TheWatcher - filtering:', function() {
+describe('SimpleTreeWatcher - filtering:', function() {
 
   // NOTE: We use the real filesystem because we need to test
   // across plaforms that it works on those actual platforms.
@@ -15,7 +15,7 @@ describe('TheWatcher - filtering:', function() {
   var tempDir = path.join(__dirname, "temp");
   var initialContent = "abc";
   var newContent = "abcdef";
-  var theWatcher;
+  var watcher;
   var recorder;
   var timeout = 1000;
   var testFS = new TestFS();
@@ -28,9 +28,9 @@ describe('TheWatcher - filtering:', function() {
   }
 
   function afterHelp(done) {
-    theWatcher.close();
+    watcher.close();
     testFS.cleanup();
-    theWatcher = null;
+    watcher = null;
     recorder = null;
     wait(done);
   }
@@ -51,16 +51,16 @@ describe('TheWatcher - filtering:', function() {
     done();
   }
 
-  function getWatcherDir(dir, watcher) {
-    watcher = watcher || theWatcher;
+  function getWatcherDir(dir, parent) {
+    parent = parent || watcher;
     if (dir === "") {
-      return watcher;
+      return parent;
     }
     var dirname = path.dirname(dir);
     if (dirname && dirname !== '.') {
-      return getWatcherDir(dir.substr(dirname.length + 1), watcher._dirs.get(dirname));
+      return getWatcherDir(dir.substr(dirname.length + 1), parent._dirs.get(dirname));
     } else {
-      return watcher._dirs.get(path.basename(dir));
+      return parent._dirs.get(path.basename(dir));
     }
   }
 
@@ -118,8 +118,8 @@ describe('TheWatcher - filtering:', function() {
         return path.basename(filename)[0] !== ".";
       }
 
-      theWatcher = new TheWatcher(tempDir, { filter: notStartsWithDot });
-      recorder = new EventRecorder(theWatcher);
+      watcher = new SimpleTreeWatcher(tempDir, { filter: notStartsWithDot });
+      recorder = new EventRecorder(watcher);
       wait(() => {
         var added = new Map();
         var events = recorder.getEvents();

@@ -1,6 +1,6 @@
 'use strict';
 
-const debug = require('./lib/debug')('thewatcher');
+const debug = require('./lib/debug')('simple-tree-watcher');
 const fs = require('fs');
 const EventEmitter = require('events');
 const path = require('path');
@@ -15,7 +15,7 @@ function shallowCopy(src) {
 
 // Should I add option to normalize path (as in always "/" never "\"?
 
-class TheWatcher extends EventEmitter {
+class SimpleTreeWatcher extends EventEmitter {
   constructor(filePath, options) {
     super();
     options = shallowCopy(options || {});
@@ -158,7 +158,7 @@ class TheWatcher extends EventEmitter {
         if (scan && stats.isDirectory()) {
           var options = shallowCopy(this._options);
           options.addOrCreate = addOrCreate;
-          var watcher = new TheWatcher(fullPath, options);
+          var watcher = new SimpleTreeWatcher(fullPath, options);
           ['add', 'create', 'remove', 'change'].forEach((event) => {
             // We need arguments so we can't use => and ... is not yet supported
             watcher.on(event, function() {
@@ -196,5 +196,5 @@ class TheWatcher extends EventEmitter {
   }
 }
 
-module.exports = TheWatcher;
+module.exports = SimpleTreeWatcher;
 

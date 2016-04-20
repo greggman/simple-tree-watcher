@@ -1,14 +1,14 @@
 'use strict';
 
-const debug         = require('../lib/debug')('thewatcher-test');  // eslint-disable-line
-const assert        = require('assert');
-const fs            = require('fs');
-const path          = require('path');
-const TheWatcher    = require('../index.js');
+const debug = require('../lib/debug')('index-test');  // eslint-disable-line
+const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+const SimpleTreeWatcher = require('../index.js');
 const EventRecorder = require('../test-lib/event-recorder');
-const TestFS        = require('../test-lib/test-fs');
+const TestFS = require('../test-lib/test-fs');
 
-describe('TheWatcher - basic', function() {
+describe('SimpleTreeWatcher - basic', function() {
 
   // NOTE: We use the real filesystem because we need to test
   // across plaforms that it works on those actual platforms.
@@ -20,7 +20,7 @@ describe('TheWatcher - basic', function() {
   var newDirs;
   var initialContent = "abc";
   var newContent = "abcdef";
-  var theWatcher;
+  var watcher;
   var recorder;
   var nameAtRoot = path.join(tempDir, "moo.txt");
   var nameOfSub = path.join(tempDir, "sub1", "sub3");
@@ -78,7 +78,7 @@ describe('TheWatcher - basic', function() {
   });
 
   after(function(done) {
-    theWatcher.close();
+    watcher.close();
     testFS.cleanup();
     done();
   });
@@ -98,24 +98,24 @@ describe('TheWatcher - basic', function() {
     }
   });
 
-  function getWatcherDir(dir, watcher) {
-    watcher = watcher || theWatcher;
+  function getWatcherDir(dir, parent) {
+    parent = parent || watcher;
     if (dir === "") {
-      return watcher;
+      return parent;
     }
     var dirname = path.dirname(dir);
     if (dirname && dirname !== '.') {
-      return getWatcherDir(dir.substr(dirname.length + 1), watcher._dirs.get(dirname));
+      return getWatcherDir(dir.substr(dirname.length + 1), parent._dirs.get(dirname));
     } else {
-      return watcher._dirs.get(path.basename(dir));
+      return parent._dirs.get(path.basename(dir));
     }
   }
 
   // yes I know these tests are dependent but it wasn't clear to me
   // at the time how to make them both simple and not be a pita
   it('reports existing files', (done) => {
-    theWatcher = new TheWatcher(tempDir);
-    recorder = new EventRecorder(theWatcher);
+    watcher = new SimpleTreeWatcher(tempDir);
+    recorder = new EventRecorder(watcher);
 
     wait(() => {
       var added = new Map();
