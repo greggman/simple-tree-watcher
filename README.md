@@ -21,8 +21,8 @@ watcher.on('create', function(f, s)     { show("create:", f, s    ); });
 watcher.on('remove', function(f, s, s2) { show("remove:", f, s, s2); });
 watcher.on('change', function(f, s)     { show("change:", f, s    ); });
 
-function show(event, f, s, n) {
-  console.log(event, f);
+function show(event, filepath, stat, oldStat) {
+  console.log(event, filePath, stat.isDirectory() ? "dir" : "file");
 }
 ```
 
