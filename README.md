@@ -30,6 +30,10 @@ function show(event, f, s, n) {
 
 create an instance of `TheWatcher` and attach events.
 
+`new TheWatcher(path, options)`
+
+`TheWatcher` is an `EventEmitter` so it has [the standard `EventEmitter` api](https://nodejs.org/api/events.html#events_class_eventemitter).
+
 ### Events
 
 #### `'add'`
@@ -50,7 +54,29 @@ Emitted when a file is change. Passed the filename, current stat, previous stat
 
 ### Options
 
+`filter`
 
+A function that is passed the path for every file and directory. It should return `true`
+to keep the file or directory or `false` to reject it. The path passed
+is relative to the original path when TheWatcher was created.
+
+### Methods
+
+#### `close`
+
+Stops watching the tree. No more events will be sent.
+
+## Philosophy / Goals
+
+My hope is there will be no surprises. You will never get a `change` or `remove`
+event for something that you didn't previously get an `add` or `create` event for.
+
+I didn't feel like adding a globbing options is a good thing. It would just bloat the
+library. You can write your own filter in a 1-3 lines of code so it seemed best to let
+you pick your own filtering methods
+
+Similarly some watch function have debouncing options etc. All of that can be layered
+over this level. No need to bloat/clutter/obfusticate this simple library.
 
 ## Platform Issues
 
@@ -74,5 +100,4 @@ the watcher.
 ### Linux
 
 Add a file get both `create` event and a `change` event for the file
-
 
