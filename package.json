@@ -1,6 +1,6 @@
 {
   "name": "thewatcher",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Watches the FileSystem for changes",
   "main": "index.js",
   "scripts": {
