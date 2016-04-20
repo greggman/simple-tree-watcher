@@ -35,8 +35,8 @@ class SimpleTreeWatcher extends EventEmitter {
     }
     this._watcher.removeListener('change', this._changeListener);
     this._watcher.removeListener('error', this._errorListener);
-    this._dirs.forEach((theWatcher) => {
-      theWatcher.close();
+    this._dirs.forEach((watcher) => {
+      watcher.close();
     });
     this._watcher.close();
     this._watcher = null;
