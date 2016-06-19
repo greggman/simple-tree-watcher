@@ -22,7 +22,7 @@ watcher.on('remove', function(f, s, s2) { show("remove:", f, s, s2); });
 watcher.on('change', function(f, s)     { show("change:", f, s    ); });
 
 function show(event, filepath, stat, oldStat) {
-  console.log(event, filePath, stat.isDirectory() ? "dir" : "file");
+  console.log(event, filepath, stat.isDirectory() ? "dir" : "file");
 }
 ```
 
