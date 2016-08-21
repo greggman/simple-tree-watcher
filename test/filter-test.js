@@ -5,6 +5,7 @@ const assert = require('assert');
 const path = require('path');
 const SimpleTreeWatcher  = require('../index.js');
 const EventRecorder = require('../test-lib/event-recorder');
+const FileRecorder = require('../test-lib/file-recorder');
 const TestFS = require('../test-lib/test-fs');
 
 describe('SimpleTreeWatcher - filtering:', function() {
@@ -17,6 +18,7 @@ describe('SimpleTreeWatcher - filtering:', function() {
   var newContent = "abcdef";
   var watcher;
   var recorder;
+  var fileRecorder;
   var timeout = 1000;
   var testFS = new TestFS();
 
@@ -32,6 +34,7 @@ describe('SimpleTreeWatcher - filtering:', function() {
     testFS.cleanup();
     watcher = null;
     recorder = null;
+    fileRecorder = null;
     wait(done);
   }
 
@@ -51,17 +54,8 @@ describe('SimpleTreeWatcher - filtering:', function() {
     done();
   }
 
-  function getWatcherDir(dir, parent) {
-    parent = parent || watcher;
-    if (dir === "") {
-      return parent;
-    }
-    var dirname = path.dirname(dir);
-    if (dirname && dirname !== '.') {
-      return getWatcherDir(dir.substr(dirname.length + 1), parent._dirs.get(dirname));
-    } else {
-      return parent._dirs.get(path.basename(dir));
-    }
+  function getWatcherDir(dir) {
+    return fileRecorder.getDir(dir);
   }
 
   function addFiles() {
@@ -120,6 +114,8 @@ describe('SimpleTreeWatcher - filtering:', function() {
 
       watcher = new SimpleTreeWatcher(tempDir, { filter: notStartsWithDot });
       recorder = new EventRecorder(watcher);
+      fileRecorder = new FileRecorder(watcher, tempDir);
+
       wait(() => {
         var added = new Map();
         var events = recorder.getEvents();
@@ -135,11 +131,11 @@ describe('SimpleTreeWatcher - filtering:', function() {
           }
         });
         // -1 because the root is in the list
-        assert.equal(added.size, 3 + 3);
-        assert.equal(getWatcherDir("")._entries.size, 3);
-        assert.equal(getWatcherDir("")._dirs.size, 1);
-        assert.equal(getWatcherDir("sub1")._entries.size, 3);
-        assert.equal(getWatcherDir("sub1")._dirs.size, 0);
+        assert.equal(added.size, 3 + 3, 'a1');
+        assert.equal(getWatcherDir("").entries.size, 3, 'a2');
+        assert.equal(getWatcherDir("").dirs.size, 1, 'a3');
+        assert.equal(getWatcherDir("sub1").entries.size, 3);
+        assert.equal(getWatcherDir("sub1").dirs.size, 0);
         noMoreEvents();
         done();
       });

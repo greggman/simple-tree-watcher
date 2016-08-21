@@ -38,5 +38,8 @@
     "grunt-eslint": "^18.1.0",
     "load-grunt-tasks": "^3.5.0",
     "mocha": "^2.4.5"
+  },
+  "dependencies": {
+    "simple-folder-watcher": "^0.3.0"
   }
 }

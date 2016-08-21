@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const SimpleTreeWatcher = require('../index.js');
 const EventRecorder = require('../test-lib/event-recorder');
+const FileRecorder = require('../test-lib/file-recorder');
 const TestFS = require('../test-lib/test-fs');
 
 describe('SimpleTreeWatcher - basic', function() {
@@ -22,6 +23,7 @@ describe('SimpleTreeWatcher - basic', function() {
   var newContent = "abcdef";
   var watcher;
   var recorder;
+  var fileRecorder;
   var nameAtRoot = path.join(tempDir, "moo.txt");
   var nameOfSub = path.join(tempDir, "sub1", "sub3");
   var nameAtSub = path.join(nameOfSub, "moo3.txt");
@@ -98,17 +100,8 @@ describe('SimpleTreeWatcher - basic', function() {
     }
   });
 
-  function getWatcherDir(dir, parent) {
-    parent = parent || watcher;
-    if (dir === "") {
-      return parent;
-    }
-    var dirname = path.dirname(dir);
-    if (dirname && dirname !== '.') {
-      return getWatcherDir(dir.substr(dirname.length + 1), parent._dirs.get(dirname));
-    } else {
-      return parent._dirs.get(path.basename(dir));
-    }
+  function getWatcherDir(dir) {
+    return fileRecorder.getDir(dir);
   }
 
   // yes I know these tests are dependent but it wasn't clear to me
@@ -116,6 +109,7 @@ describe('SimpleTreeWatcher - basic', function() {
   it('reports existing files', (done) => {
     watcher = new SimpleTreeWatcher(tempDir);
     recorder = new EventRecorder(watcher);
+    fileRecorder = new FileRecorder(watcher, tempDir);
 
     wait(() => {
       var added = new Map();
@@ -145,12 +139,12 @@ describe('SimpleTreeWatcher - basic', function() {
       // -1 because the root is in the list
       assert.equal(added.size, testFS.createdDirs.length + testFS.createdFiles.length - 1);
       assert.ok(!added.has(tempDir));
-      assert.equal(getWatcherDir("")._entries.size, 4);
-      assert.equal(getWatcherDir("")._dirs.size, 1);
-      assert.equal(getWatcherDir("sub1")._entries.size, 5);
-      assert.equal(getWatcherDir("sub1")._dirs.size, 1);
-      assert.equal(getWatcherDir("sub1/sub2")._entries.size, 5);
-      assert.equal(getWatcherDir("sub1/sub2")._dirs.size, 0);
+      assert.equal(getWatcherDir("").entries.size, 4);
+      assert.equal(getWatcherDir("").dirs.size, 1, 'cc');
+      assert.equal(getWatcherDir("sub1").entries.size, 5, 'bb');
+      assert.equal(getWatcherDir("sub1").dirs.size, 1, 'dd');
+      assert.equal(getWatcherDir("sub1/sub2").entries.size, 5);
+      assert.equal(getWatcherDir("sub1/sub2").dirs.size, 0);
       noMoreEvents();
       done();
     });
@@ -161,8 +155,8 @@ describe('SimpleTreeWatcher - basic', function() {
     var receivedEvents = new Set();
     wait(() => {
       assert.ok(receivedEvents.has("create"), "must have created event");
-      assert.equal(getWatcherDir("")._entries.size, 5);
-      assert.equal(getWatcherDir("")._dirs.size, 1);
+      assert.equal(getWatcherDir("").entries.size, 5);
+      assert.equal(getWatcherDir("").dirs.size, 1);
       noMoreEvents();
       done();
     });
@@ -189,8 +183,8 @@ describe('SimpleTreeWatcher - basic', function() {
         assert.equal(e.name, nameAtRoot, 'name is ' + nameAtRoot);
         assert.equal(e.stat.size, newContent.length);
       });
-      assert.equal(getWatcherDir("")._entries.size, 5);
-      assert.equal(getWatcherDir("")._dirs.size, 1);
+      assert.equal(getWatcherDir("").entries.size, 5);
+      assert.equal(getWatcherDir("").dirs.size, 1);
       noMoreEvents();
       done();
     });
@@ -204,8 +198,8 @@ describe('SimpleTreeWatcher - basic', function() {
       assert.equal(e.stat.size, newContent.length);
       noMoreEvents();
       wait(() => {
-        assert.equal(getWatcherDir("")._entries.size, 4);
-        assert.equal(getWatcherDir("")._dirs.size, 1);
+        assert.equal(getWatcherDir("").entries.size, 4);
+        assert.equal(getWatcherDir("").dirs.size, 1);
         done();
       });
     });
@@ -213,7 +207,7 @@ describe('SimpleTreeWatcher - basic', function() {
   });
 
   it('reports added subfolder', (done) => {
-    assert.equal(getWatcherDir("sub1")._entries.size, 5);
+    assert.equal(getWatcherDir("sub1").entries.size, 5);
     // Windows adds change event for parent subfolder
     wait(() => {
       var createEvents = recorder.getEvents('create');
@@ -229,8 +223,8 @@ describe('SimpleTreeWatcher - basic', function() {
         assert.ok(changeEvents[0].stat.isDirectory());
       }
 
-      assert.equal(getWatcherDir("sub1")._entries.size, 6);
-      assert.equal(getWatcherDir("sub1")._dirs.size, 2);
+      assert.equal(getWatcherDir("sub1").entries.size, 6);
+      assert.equal(getWatcherDir("sub1").dirs.size, 2);
       noMoreEvents();
       done();
     });
@@ -238,7 +232,7 @@ describe('SimpleTreeWatcher - basic', function() {
   });
 
   it('reports file added to subfolder', (done) => {
-    assert.equal(getWatcherDir("sub1/sub3")._entries.size, 0);
+    assert.equal(getWatcherDir("sub1/sub3").entries.size, 0);
     // OSX gets a created event for file
     // Windows gets a created event for file and a changed event for parent folder
     // Ubuntu gets a created event for file and a changed event for file
@@ -260,15 +254,15 @@ describe('SimpleTreeWatcher - basic', function() {
         }
       });
       noMoreEvents();
-      assert.equal(getWatcherDir("sub1/sub3")._entries.size, 1);
-      assert.equal(getWatcherDir("sub1/sub3")._dirs.size, 0);
+      assert.equal(getWatcherDir("sub1/sub3").entries.size, 1);
+      assert.equal(getWatcherDir("sub1/sub3").dirs.size, 0);
       done();
     });
     testFS.writeFile(nameAtSub, initialContent);
   });
 
   it('reports file changed at subfolder', (done) => {
-    assert.equal(getWatcherDir("sub1/sub3")._entries.size, 1);
+    assert.equal(getWatcherDir("sub1/sub3").entries.size, 1);
     // Check we got only change events
     wait(() => {
       var events = recorder.getEvents();
@@ -277,8 +271,8 @@ describe('SimpleTreeWatcher - basic', function() {
         assert.equal(e.name, nameAtSub, 'name is ' + nameAtSub);
         assert.equal(e.stat.size, newContent.length);
       });
-      assert.equal(getWatcherDir("sub1/sub3")._entries.size, 1);
-      assert.equal(getWatcherDir("sub1/sub3")._dirs.size, 0);
+      assert.equal(getWatcherDir("sub1/sub3").entries.size, 1);
+      assert.equal(getWatcherDir("sub1/sub3").dirs.size, 0);
       noMoreEvents();
       done();
     });
@@ -286,15 +280,15 @@ describe('SimpleTreeWatcher - basic', function() {
   });
 
   it('reports file removed from subfolder', (done) => {
-    assert.equal(getWatcherDir("sub1/sub3")._entries.size, 1);
+    assert.equal(getWatcherDir("sub1/sub3").entries.size, 1);
     recorder.setCheck((e) => {
       assert.equal(e.event, 'remove', 'event is "remove"');
       assert.equal(e.name, nameAtSub, 'name is ' + nameAtSub);
       assert.equal(e.stat.size, newContent.length);
       wait(() => {
         noMoreEvents();
-        assert.equal(getWatcherDir("sub1/sub3")._entries.size, 0);
-        assert.equal(getWatcherDir("sub1/sub3")._dirs.size, 0);
+        assert.equal(getWatcherDir("sub1/sub3").entries.size, 0);
+        assert.equal(getWatcherDir("sub1/sub3").dirs.size, 0);
         done();
       });
     });
@@ -302,16 +296,16 @@ describe('SimpleTreeWatcher - basic', function() {
   });
 
   it('reports sub folder removed from subfolder', (done) => {
-    assert.equal(getWatcherDir("sub1")._entries.size, 6);
-    assert.equal(getWatcherDir("sub1")._dirs.size, 2);
+    assert.equal(getWatcherDir("sub1").entries.size, 6);
+    assert.equal(getWatcherDir("sub1").dirs.size, 2);
     recorder.setCheck((e) => {
       assert.equal(e.event, 'remove', 'event is "remove"');
       assert.equal(e.name, nameOfSub, 'name is ' + nameOfSub);
       assert.ok(e.stat.isDirectory());
       wait(() => {
         noMoreEvents();
-        assert.equal(getWatcherDir("sub1")._entries.size, 5);
-        assert.equal(getWatcherDir("sub1")._dirs.size, 1);
+        assert.equal(getWatcherDir("sub1").entries.size, 5);
+        assert.equal(getWatcherDir("sub1").dirs.size, 1);
         done();
       });
     });
