@@ -1,7 +1,6 @@
 'use strict';
 
 const debug = require('./lib/debug')('simple-tree-watcher');
-const fs = require('fs');
 const EventEmitter = require('events');
 const path = require('path');
 const SimpleFolderWatcher = require('simple-folder-watcher');
