@@ -17,6 +17,7 @@ describe('SimpleTreeWatcher - basic', function() {
   var tempDir = path.join(__dirname, "temp");
   var tempDir2 = path.join(__dirname, "temp2");
   var tempDir3 = path.join(__dirname, "temp/temp2");
+  var tempDir4 = path.join(__dirname, "temp/temp4");
   var newFiles;
   var newDirs;
   var initialContent = "abc";
@@ -368,11 +369,59 @@ describe('SimpleTreeWatcher - basic', function() {
     testFS.mv(tempDir2, tempDir3);
   });
 
+  it('reports renamed non-empty subfolder in correct order', (done) => {
+    wait(() => {
+      recorder.showEvents();
+      var removeTempEvents = recorder.getEvents('remove', tempDir3);
+      assert.equal(removeTempEvents.length, 1, "there's an event for temp2");
+      newFiles.forEach((fileName) => {
+        var events = recorder.getEvents('remove', fileName);
+        assert.equal(events.length, 1, "there's one remove event per file");
+        assert.equal(events[0].stat.size, initialContent.length);
+        assert.ok(events[0].id < removeTempEvents[0].id, "event came before subfolder");
+      });
+      newDirs.forEach((fileName) => {
+        var events = recorder.getEvents('remove', fileName);
+        assert.equal(events.length, 1, "there's one remove event per dir");
+        assert.ok(events[0].stat.isDirectory());
+        // use >= because tempDir3 is on the list
+        assert.ok(events[0].id <= removeTempEvents[0].id, "event came before subfolder");
+      });
+
+      newFiles = newFiles.map((fileName) => {
+        return fileName.replace(tempDir3, tempDir4);
+      });
+      newDirs = newDirs.map((fileName) => {
+        return fileName.replace(tempDir3, tempDir4);
+      });
+      var createTempEvents = recorder.getEvents('create', tempDir4);
+      assert.equal(createTempEvents.length, 1, "there's an event for temp4");
+      assert.ok(createTempEvents[0].id > removeTempEvents[0].id, "create comes after remove");
+      newFiles.forEach((fileName) => {
+        var events = recorder.getEvents('create', fileName);
+        assert.equal(events.length, 1, "there's one create event per file");
+        assert.equal(events[0].stat.size, initialContent.length);
+        assert.ok(events[0].id > createTempEvents[0].id, "event came after subfolder");
+      });
+      newDirs.forEach((fileName) => {
+        var events = recorder.getEvents('create', fileName);
+        assert.equal(events.length, 1, "there's one create event per dir");
+        assert.ok(events[0].stat.isDirectory());
+        // use >= because tempDir3 is on the list
+        assert.ok(events[0].id >= createTempEvents[0].id, "event came after subfolder");
+      });
+      noMoreEvents();
+      done();
+    });
+    testFS.mv(tempDir3, tempDir4);
+  });
+
+
   it('reports removed non-empty subfolder in correct order', (done) => {
     wait(() => {
       recorder.showEvents();
-      var tempEvents = recorder.getEvents('remove', tempDir3);
-      assert.equal(tempEvents.length, 1, "there's an event for temp2");
+      var tempEvents = recorder.getEvents('remove', tempDir4);
+      assert.equal(tempEvents.length, 1, "there's an event for temp4");
       newFiles.forEach((fileName) => {
         var events = recorder.getEvents('remove', fileName);
         assert.equal(events.length, 1, "there's one remove event per file");
@@ -389,7 +438,7 @@ describe('SimpleTreeWatcher - basic', function() {
       noMoreEvents();
       done();
     });
-    testFS.mv(tempDir3, tempDir2);
+    testFS.mv(tempDir4, tempDir2);
   });
 
 });
